@@ -43,56 +43,206 @@
 			<figcaption>You can add images with captions!</figcaption>
 		</figure>
 		-->
-
 		<!--
 		We've already added one heading per part, to make your write-up as navigable when grading. Please fit your write-up within these sections!
 		-->
 
 		<h2>Overview</h2>
-		Give a high-level overview of what you implemented in this homework. Think about what you've built as a whole. Share your thoughts on what interesting things you've learned from completing the homework.
+		<p>
+		In this homework we implemented the systems from path tracing to full rendering of 3d scenes. At each level we also implemented the methods along the way that make these algorithms computationally efficient. First we start with the path tracer, and then implement BVH (bounding volume hierarchy) to get rid of redundant costs which affect meshes especially as they get larger. Then, we compute direct lighting using Monte Carlo methods for light sampling the scene's hemisphere and then the light sources themselves. On top of that we put global illumination and compute light path bouncing, making that more efficient with the Russian Roulette method. At the final highest layer we implement adaptive sampling to lessen redundant sampling and its costs by checking pixel value convergence. 
+			</p>
+		<p>
+		Overall I think this is an implementation in how to successfully make efficient (through different types of random sampling, probability checks and heuristics) rendering decisions for overall scenes so that they are “good enough” so to speak to convince us of their realisticness and fool our perception. Or in another way I think about it, it has us implement the math for what brute forcing rendering would look like, explains why it is too costly when scaled, and then at each stage how to cleverly through established best math practices make it look as equivalent to the fully processed render as possible while optimizing costs. 
+		</p>
 
 		<h2>Part 1: Ray Generation and Scene Intersection</h2>
 
-		<p>Here is an example 2x2 gridlike structure using an HTML table. Each <b>tr</b> is a row and each <b>td</b> is a column in that row. You might find this useful for framing and showing your result images in an organized fashion.</p>
-		<div style="display: flex; flex-direction: column; align-items: center;">
+		<p>
+		A path tracer needs to know, for every pixel, which direction the camera is looking through it. Ray generation answers that.
+		</p>
+
+		<h4>Camera Sensor Math </h4>
+		 <img src="assets/camerasensor.png" width="300px"/>
+		 <br>
+
+		 <p>
+			The camera model. In camera space, the camera sits at the origin and looks down the −Z axis. A rectangular virtual sensor lies on the plane z = −1. Its size comes from the field of view: its corners are at (±tan(hFov/2), ±tan(vFov/2), −1). The wider the field of view, the bigger the sensor, and the more of the scene the camera sees. 
+			</p>
+
+			<p>
+			Intuitively, I think about as the amount I can see when trying different VR headsets or AR glasses. Also an adjustable setting in certain first person games. (Example. Quest3 FOV is 110 horizontal, 96 vertical, vision pro is estimated 90-100 degree horizontal and 96 degree estimated vertical)
+		 </p>
+
+		 <h4>Pixel Coordinate Math </h4>
+		  <img src="assets/pixelsample.png" width="300px"/>
+
+		<div style="white-space: pre-line;">
+			Choosing a point inside the pixel. In raytrace_pixel, the pixel (x, y) is the bottom-left corner of a one-unit square. For each sample, I add a random offset in [0, 1) from the sampler, which gives a random point inside the pixel. Random positions, rather than always the center, are what give antialiasing once the samples are averaged. I then divide by the image width and height to get normalized coordinates in [0, 1] × [0, 1], where (0, 0) is the bottom-left of the image and (1, 1) is the top-right.
+
+			Mapping the image point to the sensor. generate_ray maps the normalized coordinates (x, y) linearly onto the sensor:
+
+			sensor x = (2x − 1) · tan(hFov/2)
+
+			sensor y = (2y − 1) · tan(vFov/2)
+
+			sensor z = −1
+
+			Here 0 maps to the sensor’s minimum edge and 1 to its maximum edge. The field of view is stored in degrees, so it is converted to radians before calling tan.
+
+			Building the ray. The ray starts at the camera and passes through that sensor point, so its camera-space direction is just the sensor point itself. To get a world-space ray, I rotate that direction with the camera-to-world matrix c2w and normalize it, so the direction has length 1 and t measures true distance. The origin is already in world space, since it is the camera position pos. Only the direction needs rotating, because a rotation does not apply to a position that is already expressed in world coordinates. I also set the ray’s min_t to the near clip distance and max_t to the far clip distance, so anything closer or farther than those is ignored.
+
+			Using the ray. raytrace_pixel calls est_radiance_global_illumination on each ray to estimate the light arriving along it. The pixel’s final value is the average over all of its samples.
+		</div>
+		<!-- html table notes			
+			Each <b>tr</b> is a row and each <b>td</b> is a column in that row. </p>
+		-->
+
+		<h3> Triangle Intersection Algorithms</h3>
+	<div style="white-space: pre-line;">
+			A camera ray is the set of points o + t·d, where o is the origin, d is the direction, and t is the distance along the ray. We want to know whether the ray passes through a triangle, and if so, at which t.
+
+Any point inside a triangle with corners p1, p2, p3 can be written as p1 + b2·(p2 − p1) + b3·(p3 − p1). Here b2 and b3 are barycentric weights, and the third weight is b1 = 1 − b2 − b3. The point lies inside the triangle exactly when all three weights are non-negative.
+
+The ray hits the triangle where the two expressions are the same point:
+
+o + t·d = p1 + b2·(p2 − p1) + b3·(p3 − p1)
+
+This is three linear equations, one each for x, y and z, with three unknowns: t, b2 and b3.
+
+Möller Trumbore from lecture solves this system directly with Cramer’s rule, which can be written with cross and dot products. Like such:
+
+e1 = p2 − p1 and e2 = p3 − p1 (the two triangle edges from p1)
+s = o − p1 (the vector from the triangle corner to the ray origin)
+s1 = d × e2 and s2 = s × e1
+
+Then:
+
+denominator = s1 · e1
+t = (s2 · e2) / denominator
+b2 = (s1 · s) / denominator
+b3 = (s2 · d) / denominator
+b1 = 1 − b2 − b3
+
+If the denominator is nearly zero, the ray is parallel to the triangle’s plane and cannot hit it, so I return no hit.
+
+Determining whether the hit counts:
+
+Solving gives numbers, but three checks decide whether they represent a real hit:
+
+1. Inside the triangle. b1, b2 and b3 must all be at least 0. The weights always add to 1, so a negative weight means the point is outside one of the triangle’s edges.
+
+2. Valid distance. t must lie in [min_t, max_t]. This rules out hits behind the camera, hits closer than the near clip plane, and hits farther than something already found.
+
+3. Nearest wins. When a hit is accepted, I set the ray’s max_t to t. Any later, farther hit then fails check 2, so after all primitives are tested, the nearest surface is the one that remains.
+
+The two functions we have for intersecting are
+
+has_intersection only answers yes or no, so it runs the test and, on success, updates max_t.
+
+intersect does the same and also fills in the Intersection record:
+
+t: the hit distance.
+n: the surface normal, computed as b1·n1 + b2·n2 + b3·n3 from the three vertex normals and normalized. These are the same barycentric weights used to interpolate color in the rasterizer homework, and they give smooth shading across a mesh.
+primitive: a pointer to this triangle.
+bsdf: the surface material, from get_bsdf().
+
+We do this because Möller Trumbore needs no precomputed plane equation. It also produces the barycentric weights as a by-product of finding t, and intersect needs those weights anyway to interpolate the normal, so the same computation serves both purposes.
+
+		</div>
+
+		<h3>Normal renders of small triangle count dae files</h3>
+		
+			<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
 				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/banana.png" width="300px"/>
+				  <figcaption>Normal Rendered banana </figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
-				</td>
-			  </tr>
-			  <tr>
-				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/CBempty.png" width="300px"/>
+				  <figcaption>Normal rendered empty box.</figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/cornell.png" width="400px"/>
-				  <figcaption>Caption goes here.</figcaption>
+				  <img src="assets/part1/CBspheres.png" width="300px"/>
+				  <figcaption>Normal rendered spheres</figcaption>
 				</td>
 			  </tr>
 			</table>
 		</div>
 		
 		<h2>Part 2: Bounding Volume Hierarchy</h2>
+
+		<h3>High triangle count </h3>
 		
+					<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part2/CBlucy.png" width="300px"/>
+				  <figcaption>Lucy </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part2/cow.png" width="300px"/>
+				  <figcaption>Cow</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part2/max.png" width="300px"/>
+				  <figcaption>Max Planck</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
 
 		<h2>Part 3: Direct Illumination</h2>
 		
+		<h3>Soft shadows n light rays (for bunny) </h3>
 
 		<h2>Part 4: Global Illumination</h2>
 		
+		<h3>Global Illumination </h3>
+
+		<h3>Direct vs Indirect Illumination</h3>
+
+		<h3>Non accumulating mth bounce of light </h3>
+
+		<h3>Accumulated vs Unaccumlated Light Bouncing</h3>
+
+		<h3>Russian Roulette but for Lighting up Bunnies</h3>
+
+		<h3>Different # of samples per pixel</h3>
+
 		<h2>Part 5: Adaptive Sampling</h2>
 		
+		<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part5/adaptivebunny.png" width="300px"/>
+				  <figcaption>Normal Rendered banana </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part5/adaptivebunny_rate.png" width="300px"/>
+				  <figcaption>Adaptive Rate</figcaption>
+				</td>
+			  </tr>
+			<tr>
+				<td style="text-align: center;">
+				  <img src="assets/part5/adaptivespheres.png" width="300px"/>
+				  <figcaption>Normal Rendered banana </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part5/adaptivespheres_rate.png" width="300px"/>
+				  <figcaption>Adaptive Rate</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+		
 
-		<h2>(Optional) Part 6: Extra Credit Opportunities</h2>
+		<h2>AI assistance acknowledgement</h2>
 		
-		
+	<!--	
 		<h2>Additional Notes (please remove)</h2>
 		<ul>
 			<li>You can also add code if you'd like as so: <code>code code code</code></li>
@@ -105,4 +255,6 @@
 		</ul>
 		</div>
 	</body>
+
+-->
 </html>
