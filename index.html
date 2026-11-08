@@ -62,7 +62,7 @@
 		</p>
 
 		<h4>Camera Sensor Math </h4>
-		 <img src="assets/camerasensor.png" width="300px"/>
+		 <img src="assets/camerasensor.png" width="500px"/>
 		 <br>
 
 		 <p>
@@ -74,7 +74,7 @@
 		 </p>
 
 		 <h4>Pixel Coordinate Math </h4>
-		  <img src="assets/pixelsample.png" width="300px"/>
+		  <img src="assets/pixelsample.png" width="400px"/>
 
 		<div style="white-space: pre-line;">
 			Choosing a point inside the pixel. In raytrace_pixel, the pixel (x, y) is the bottom-left corner of a one-unit square. For each sample, I add a random offset in [0, 1) from the sampler, which gives a random point inside the pixel. Random positions, rather than always the center, are what give antialiasing once the samples are averaged. I then divide by the image width and height to get normalized coordinates in [0, 1] × [0, 1], where (0, 0) is the bottom-left of the image and (1, 1) is the top-right.
@@ -173,18 +173,18 @@ We do this because Möller Trumbore needs no precomputed plane equation. It also
 		
 		<h2>Part 2: Bounding Volume Hierarchy</h2>
 
-		<h3>High triangle count </h3>
+		<h3>Normal renders of high triangle count dae files</h3>
 		
 					<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
 				<td style="text-align: center;">
 				  <img src="assets/part2/CBlucy.png" width="300px"/>
-				  <figcaption>Lucy </figcaption>
+				  <figcaption>Lucy (the statue)</figcaption>
 				</td>
 				<td style="text-align: center;">
 				  <img src="assets/part2/cow.png" width="300px"/>
-				  <figcaption>Cow</figcaption>
+				  <figcaption>Cow (moo)</figcaption>
 				</td>
 				<td style="text-align: center;">
 				  <img src="assets/part2/max.png" width="300px"/>
@@ -195,22 +195,144 @@ We do this because Möller Trumbore needs no precomputed plane equation. It also
 		</div>
 
 		<h2>Part 3: Direct Illumination</h2>
+
+		<div style="white-space: pre-line;">
+
+Both direct lighting functions answer the same question: how much light arrives at the hit point straight from a light source, and how much of it is reflected toward the camera?
+
+1. Local frame. At the hit point I build a coordinate system with the surface normal as the +z axis (o2w and its transpose w2o). In this frame, cos θ for any direction is simply its z component.
+
+2. Outgoing direction. w_out is the direction back toward the camera, converted to the local frame. hit_p is the hit position in world space.
+
+3. The estimator. The reflection equation is an integral over the hemisphere of L_i · f · cos θ. I estimate it by Monte Carlo: average L_i · f · cos θ / pdf over randomly chosen directions. Here f comes from DiffuseBSDF::f, which is albedo / π.
+Uniform hemisphere sampling
+
+Draw lights × ns_area_light directions uniformly on the local hemisphere. Each has a pdf of 1/(2π).
+Convert each direction to world space with o2w and cast a ray from hit_p. The ray’s min_t is EPS_F so that it does not hit the surface it started on.
+
+If the ray hits something that emits light, add emission · f · cos θ / pdf. If it hits anything else, that surface has zero emission, so it adds nothing.
+Divide the sum by the number of samples.
+
+The weakness is that directions are chosen blindly. For a small light, most rays miss it and contribute zero, so the estimate is noisy.
+Light sampling
+
+For each light, call sample_L. It picks a point on the light and returns its radiance, the world-space direction, the distance, and the pdf.
+
+Convert the direction to the local frame. If its z component is not positive, the light is behind the surface and contributes nothing, so no ray is cast.
+Cast a shadow ray from EPS_F to distance − EPS_F. The start offset avoids hitting the surface itself, and the end offset avoids hitting the light. If the ray hits anything, the point is in shadow and the sample contributes zero.
+Otherwise add radiance · f · cos θ / pdf.
+
+Average each light’s samples and sum over lights. A delta light (point or directional) is sampled only once, since every sample from it is identical.
+
+Every ray is aimed at the light, so none is wasted. This also makes point lights renderable, which hemisphere sampling cannot do, because a random direction almost never hits a single point.
+
+		</div>
 		
+		<h3>Images rendered in both implementations </h3>
+
+			<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/CBbunny_16_8.png" width="300px"/>
+				  <figcaption>Zero bounce radiance on bunny </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/screenshots/CBbunny_H_16_8.png" width="300px"/>
+				  <figcaption>Uniform Hemisphere Sampling at 16 and 8</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/screenshots/CBbunny_H_64_32.png" width="300px"/>
+				  <figcaption>Uniform Hemisphere Sampling at 64 and 32</figcaption>
+				</td>
+			  </tr>
+
+			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_1_1.png" width="300px"/>
+				  <figcaption>Importance sampling at 1 and 1</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_64_32.png" width="300px"/>
+				  <figcaption>Importance sampling at 64 and 32</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part3/cow_H_64_32.png" width="300px"/>
+				  <figcaption>Blank cow because of lack of point light sources</figcaption>
+				</td>
+			  </tr>
+			  			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/dragon_64_32.png" width="300px"/>
+				  <figcaption>Direct lighting importance sampling of dragon</figcaption>
+				</td>
+			  </tr> 
+			</table>
+		</div>
+
 		<h3>Soft shadows n light rays (for bunny) </h3>
+
+		<p>The  pattern is that with -l 1 the shadow edge is grainy, because each pixel sees the light from only one random point. The noise shrinks as -l grows, roughly with the square root of the count, so four times the rays halves the noise. By -l 64 the shadows look smooth.</p>
+
+			<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_l1.png" width="300px"/>
+				  <figcaption>1 light ray bunny</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_l4.png" width="300px"/>
+				  <figcaption>4 light rays bunny</figcaption>
+				</td>
+				</tr>
+				<tr>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_l16.png" width="300px"/>
+				  <figcaption>16 light rays bunny</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part3/bunny_l64.png" width="300px"/>
+				  <figcaption>64 light rays bunny</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+				<h3>Uniform hemisphere vs light sampling </h3>
+
+		<div style="white-space: pre-line;">
+
+			Both methods converge to the same image, but light sampling reaches it with less noise. With hemisphere sampling, only the few rays that happen to hit the light contribute, so lit regions and shadows look grainyish even at a high sample count. With light sampling, every sample points at the light, so the only variation comes from which point on the light was chosen and whether something blocks it. At equal sample counts, its soft shadows are visibly smoother. Light sampling also handles point lights. The glow around the box light above the bunny looks different, because hemisphere sampling does not model the light’s directional falloff.
+			
+		</div>
 
 		<h2>Part 4: Global Illumination</h2>
 		
+		<div style="white-space: pre-line;"></div>
+
 		<h3>Global Illumination </h3>
+
+		<div style="white-space: pre-line;"></div>
 
 		<h3>Direct vs Indirect Illumination</h3>
 
+		<div style="white-space: pre-line;"></div>
+
 		<h3>Non accumulating mth bounce of light </h3>
+
+		<div style="white-space: pre-line;"></div>
 
 		<h3>Accumulated vs Unaccumlated Light Bouncing</h3>
 
+		<div style="white-space: pre-line;"></div>
+
 		<h3>Russian Roulette but for Lighting up Bunnies</h3>
 
+		<div style="white-space: pre-line;"></div>
+
 		<h3>Different # of samples per pixel</h3>
+
+		<div style="white-space: pre-line;"></div>
 
 		<h2>Part 5: Adaptive Sampling</h2>
 		
