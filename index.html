@@ -238,11 +238,11 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 				  <figcaption>Zero bounce radiance on bunny </figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/screenshots/CBbunny_H_16_8.png" width="300px"/>
+				  <img src="assets/part3/CBbunny_H_16_8.png" width="300px"/>
 				  <figcaption>Uniform Hemisphere Sampling at 16 and 8</figcaption>
 				</td>
 				<td style="text-align: center;">
-				  <img src="assets/screenshots/CBbunny_H_64_32.png" width="300px"/>
+				  <img src="assets/part3/CBbunny_H_64_32.png" width="300px"/>
 				  <figcaption>Uniform Hemisphere Sampling at 64 and 32</figcaption>
 				</td>
 			  </tr>
@@ -312,25 +312,194 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 
 		<h3>Global Illumination </h3>
 
+				<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_gi.png" width="300px"/>
+				  <figcaption>Global illumination bunny</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/spheres_gi.png" width="300px"/>
+				  <figcaption>Global illumination spheres</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Direct vs Indirect Illumination</h3>
+
+						<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_direct.png" width="300px"/>
+				  <figcaption>Direct illumination bunny</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_indirect.png" width="300px"/>
+				  <figcaption>Indirect illumination bunny</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
 
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Non accumulating mth bounce of light </h3>
 
+					<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m0.png" width="300px"/>
+				  <figcaption>m bounce 0 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m1.png" width="300px"/>
+				  <figcaption>m bounce 1</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m2.png" width="300px"/>
+				  <figcaption>m bounce 2</figcaption>
+				</td>
+			  </tr>
+
+			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m3.png" width="300px"/>
+				  <figcaption>m bounce 3 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m4.png" width="300px"/>
+				  <figcaption>m bounce 4</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_bounce_only_m5.png" width="300px"/>
+				  <figcaption>m bounce 5</figcaption>
+				</td>
+			  </tr>
+			</table>
+		</div>
+
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Accumulated vs Unaccumlated Light Bouncing</h3>
+
+									<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m0.png" width="300px"/>
+				  <figcaption>accum 0 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m1.png" width="300px"/>
+				  <figcaption>accum 1</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m2.png" width="300px"/>
+				  <figcaption>accum 2</figcaption>
+				</td>
+			  </tr>
+
+			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m3.png" width="300px"/>
+				  <figcaption>accum 3 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m4.png" width="300px"/>
+				  <figcaption>accum 4</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_accum_m5.png" width="300px"/>
+				  <figcaption>accum 5</figcaption>
+				</td>
+			  </tr>
+			</table>
 
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Russian Roulette but for Lighting up Bunnies</h3>
 
+							<div style="display: flex; flex-direction: column; align-items: center;">
+			<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m0.png" width="300px"/>
+				  <figcaption>rr 0 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m1.png" width="300px"/>
+				  <figcaption>rr 1</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m2.png" width="300px"/>
+				  <figcaption>rr 2</figcaption>
+				</td>
+			  </tr>
+
+			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m3.png" width="300px"/>
+				  <figcaption>rr 3 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m4.png" width="300px"/>
+				  <figcaption>rr 4</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_rr_m100.png" width="300px"/>
+				  <figcaption>rr 100</figcaption>
+				</td>
+			  </tr>
+			</table>
+
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Different # of samples per pixel</h3>
+
+					<table style="width: 100%; text-align: center; border-collapse: collapse;">
+			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s1.png" width="300px"/>
+				  <figcaption>s1 </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s2.png" width="300px"/>
+				  <figcaption>s2</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s4.png" width="300px"/>
+				  <figcaption>s4</figcaption>
+				</td>
+			  </tr>
+
+			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s8.png" width="300px"/>
+				  <figcaption>s8</figcaption> </figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s16.png" width="300px"/>
+				  <figcaption>s16</figcaption>
+				</td>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s64.png" width="300px"/>
+				  <figcaption>s68</figcaption>
+				</td>
+			  </tr>
+
+			  			  			  <tr>
+				<td style="text-align: center;">
+				  <img src="assets/part4/bunny_s1024.png" width="300px"/>
+				  <figcaption>s1024 </figcaption>
+				</td>
+			  </tr>
+			</table>
 
 		<div style="white-space: pre-line;"></div>
 
