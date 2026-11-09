@@ -173,6 +173,43 @@ We do this because Möller Trumbore needs no precomputed plane equation. It also
 		
 		<h2>Part 2: Bounding Volume Hierarchy</h2>
 
+		<div style="white-space: pre-line;">
+
+		BVH construction algorithm
+
+		A ray tracer that tests every ray against every primitive is too slow for scenes with many triangles. A BVH is a binary tree of bounding boxes that lets a ray skip whole groups of primitives it cannot hit.
+
+		1. Bounding box. construct_bvh works on a range [start, end) of the shared primitive vector. It first expands a BBox over the boxes of every primitive in that range, then creates a node with that box.
+
+		2. Leaf case. If the range holds at most max_leaf_size primitives (4 by default), the node is a leaf. It keeps start and end, and the recursion stops. A leaf does not copy primitives. It only remembers its slice of the shared vector.
+
+		3. Choosing the split axis. Otherwise the node must be split. I build a second box around the centroids of the primitives’ boxes and pick the axis (x, y or z) along which that centroid box is longest. The primitives are most spread out along that axis, so splitting there separates them best.
+
+		4. Choosing the split point. The split point is the midpoint of the centroid range on that axis. I chose it because it is cheap (one pass over the primitives) and tends to produce boxes that overlap little, so traversal can skip more of the tree.
+
+		5. Partitioning. std::partition reorders the range in place so every primitive whose centroid lies below the split point comes first. The left child gets [start, mid) and the right child gets [mid, end). Nothing is copied, because both children are just sub-ranges of the same vector.
+
+		6. Recursion. The function calls itself on each half and stores the results in l and r.
+
+		7. The degenerate case. If every centroid lands on one side (for example, when all centroids are identical), one child would receive exactly the same primitives as its parent. It would pick the same split again and never shrink, so the recursion would never end. In that case I split by count instead: std::nth_element puts the median primitive in the middle, so each child gets about half the primitives and the recursion always terminates.
+
+		BVH traversal
+
+		intersect first tests the ray against the node’s box using BBox::intersect, passing copies of the ray’s [min_t, max_t], since the box test overwrites them. If the box is missed, the whole subtree is skipped. At a leaf, the ray is tested against each primitive. At an interior node, both children are visited, because the closest hit could be in either one. has_intersection works the same way but can stop at the first hit, since any hit answers its question.
+
+		Why this heuristic. The midpoint of the centroid range is cheap, O(n) per level, and tends to produce boxes that overlap little, which lets traversal skip more of the tree. Choosing the widest axis avoids long thin boxes. It is not as good as a surface area heuristic, which weighs actual ray-hit cost, but it is simple and gave good results. 
+
+	</div>
+
+<div style="white-space: pre-line;">
+
+	Unfortunately I did not have enough time to do a run time comparrison of scenes with and without BVH. I forgot about this part when I was doing the homework and at this point in an effort to just get something turned in, I am going to writeup what I estimate to believe would happen.
+
+	My process to run a file without BVH would be just to temporarily make the construct_bvh function return a single leaf.
+
+	My belief is that the speedup should grow with the triangle count. Without a BVH, each ray tests every primitive, so the cost grows linearly with the scene size. With a BVH, a ray only visits the boxes it passes through, so the cost grows roughly with the depth of the tree. For small scenes like the sphere box, the BVH gives little benefit because traversing boxes costs about as much as testing a few primitives directly.
+</div>
+
 		<h3>Normal renders of high triangle count dae files</h3>
 		
 					<div style="display: flex; flex-direction: column; align-items: center;">
@@ -308,7 +345,29 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 
 		<h2>Part 4: Global Illumination</h2>
 		
-		<div style="white-space: pre-line;"></div>
+		<div style="white-space: pre-line;">
+
+			Indirect lighting implementation
+
+			at_least_one_bounce_radiance estimates all the light arriving at a hit point, including light that has already bounced off other surfaces.
+
+1. Depth tracking. Each camera ray starts with depth = max_ray_depth (set in raytrace_pixel). Every bounce lowers it by one, so depth is the number of bounces still allowed.
+
+2. Direct light at this point. The function adds one_bounce_radiance, the direct lighting from Part 3. With isAccumBounces off, it adds this only at the last allowed bounce (depth == 1), which isolates a single bounce of light.
+
+3. Stopping. If depth <= 1, no further bounces are allowed, and the function returns.
+
+4. Russian roulette. The first indirect bounce is always traced. After that, each bounce is terminated with probability 0.35. This gives paths a random length instead of a fixed cutoff, which avoids the bias of cutting everything off at a fixed depth.
+
+5. Sampling the next direction. I call sample_f on the BSDF to get a random incoming direction wi in the local frame, together with its pdf and the BSDF value f. For a diffuse surface this direction is cosine-weighted.
+
+6. Tracing the next ray. I convert wi to world space with o2w, cast a ray from hit_p with min_t = EPS_F and depth − 1, and find where it hits. If it hits nothing, it contributes nothing.
+
+7. Recursion and weighting. At the new hit point I call the same function. The result is multiplied by f · cos θ / pdf, which is the Monte Carlo weight for one randomly chosen direction. If Russian roulette was applied, I also divide by the continuation probability 0.65. That division keeps the estimate unbiased: surviving paths are made brighter to make up for the paths that were cut.
+
+8. No double counting. The recursion does not add the next hit’s emission. Direct lighting already accounts for light sources at each hit, so adding emission again would count the light twice.
+
+		</div>
 
 		<h3>Global Illumination </h3>
 
@@ -331,6 +390,9 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 
 		<h3>Direct vs Indirect Illumination</h3>
 
+		<p>
+		Direct light gives the sharp, hard-edged illumination, lit only where a surface can see a light. Indirect light adds "soft fill", it brightens areas in shadow and carries color from nearby surfaces, such as the red and blue walls tinting the bunny.
+		</p>
 						<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
@@ -349,6 +411,10 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Non accumulating mth bounce of light </h3>
+
+		<p>
+			-m 0 shows only the light source itself. -m 1 is direct light only. -m 2 shows light that bounced once off a surface before reaching the camera, and it is dimmer and softer, lighting the places direct light cannot reach and showing color bleeding. -m 3 is dimmer and softer again. Each further bounce carries less energy because every diffuse bounce absorbs part of the light. 
+		</p>
 
 					<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -388,6 +454,11 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 
 		<h3>Accumulated vs Unaccumlated Light Bouncing</h3>
 
+		<p>Compared with the non accumulated light photos above,
+			<br>
+			With accumulation on (-o 1), each increase of m adds another bounce, so the image keeps getting brighter and more complete, with the gain shrinking each time. With it off (-o 0), each image shows only a single bounce, and the images get dimmer as m grows.
+		</p>>
+
 									<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
@@ -425,6 +496,8 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 
 		<h3>Russian Roulette but for Lighting up Bunnies</h3>
 
+		<p>The -m 100 image looks nearly the same as -m 5, because paths with many bounces carry little energy and roulette ends them early, so a huge depth limit stays practical.</p>
+
 							<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
@@ -461,6 +534,10 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 		<div style="white-space: pre-line;"></div>
 
 		<h3>Different # of samples per pixel</h3>
+
+		<p>
+			With 1 sample per pixel the image is very grainy. The noise falls as the count grows, roughly with its square root, so the 1024-sample image is smooth.
+		</p>
 
 					<table style="width: 100%; text-align: center; border-collapse: collapse;">
 			  <tr>
@@ -504,6 +581,31 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 		<div style="white-space: pre-line;"></div>
 
 		<h2>Part 5: Adaptive Sampling</h2>
+
+		<div style="white-space: pre-line;">
+
+			A fixed sample count wastes effort. Flat, evenly lit pixels, like a wall, give nearly the same value on every sample and settle after a few. Pixels in soft shadows or under strong indirect light vary a lot and need many samples. Adaptive sampling watches each pixel as it goes and stops once it has converged, so the samples go to the hard pixels. In this renderer, -s becomes a maximum number of samples, not a fixed count.
+Implementation in raytrace_pixel
+
+1. Taking samples. Each iteration picks a random point in the pixel, generates a camera ray with depth max_ray_depth, and calls est_radiance_global_illumination. The result is added to a running total.
+
+2. Keeping two sums. For every sample I compute its illuminance x_k with illum() and update s1 = Σ x_k and s2 = Σ x_k². I never store individual samples. These two sums are enough to compute the mean and variance at any time.
+
+3. Checking convergence once per batch. Checking after every sample would be costly, so I check only every samplesPerBatch samples (32 by default), and never after the final sample. At each check:
+
+The mean is μ = s1 / n.
+
+The variance is σ² = (s2 − s1²/n) / (n − 1).
+
+The convergence measure is I = 1.96 · σ / √n.
+
+4. What I means. I is the half-width of a 95% confidence interval for the pixel’s true average. With 95% confidence, the true value lies within μ ± I. It is small when the variance is small or when n is large.
+
+5. Stopping rule. If I ≤ maxTolerance · μ (with maxTolerance = 0.05 by default), the pixel’s estimate is within 5% of its mean, so the pixel is treated as converged and sampling stops.
+
+6. Output. The pixel’s value is total / n, using the actual number of samples taken. That same n is stored in sampleCountBuffer, which produces the _rate.png image. In that image, red means many samples and blue means few.
+
+		</div>
 		
 		<div style="display: flex; flex-direction: column; align-items: center;">
 			<table style="width: 100%; text-align: center; border-collapse: collapse;">
@@ -532,6 +634,20 @@ Every ray is aimed at the light, so none is wasted. This also makes point lights
 		
 
 		<h2>AI assistance acknowledgement</h2>
+	
+		<div style="white-space: pre-line;">
+			Due to the length of the assignment this is the first time where I feel like I did have to have AI really help me, especially with the writeup portion. 
+			Due to the math complexity and the building upon of one function / code file to the next, I felt like I was not tying in all the ideas enough in a intuitively coherent way to help see the bigger picture.
+			Or at least not as succint and less confusing than the AI summary could. I used it to summarize more clearly what the code was doing, and organize step by step how the code met the requirements. 
+			
+			I have some complicated feelings about this but can't really deny how much clearer it sounds after the AI gave it a lookover.
+
+			I also used it to help cleanup the formatting of my c++ code but the syntax is mostly mine and just comes from the class slides / instructions. 
+			The very math heavy parts felt like I was just almost transcribing from the lessons and then had AI fix spacing for readability. 
+
+			All file generation rendering with options and so forth done in command line, as well as the original writing of code explanations (before readability edits) are my own. 
+
+		</div>
 		
 	<!--	
 		<h2>Additional Notes (please remove)</h2>
